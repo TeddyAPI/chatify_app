@@ -13,7 +13,7 @@ export const generateToken = (userId, res) => {
         expiresIn: "7d",
     });
 
-    //브라우저에 token을 쿠키로 저장한다.
+    //res.cookie에 token을 쿠키로 저장한다.
     res.cookie("jwt", token, {
         maxAge: 7 * 24 * 60 * 60 * 1000, //7일 후 만료됨
         httpOnly: true, // prevent XSS attacks: cross-site scripting,쿠키가 JavaScript에서 접근 불가하도록 설정

@@ -3,7 +3,7 @@ import User from "../models/User.js";
 import { sendWelcomeEmail } from "../emails/emailHandlers.js";
 import bcrypt from "bcryptjs";
 import { ENV } from "../lib/env.js";
-// import cloudinary from "../lib/cloudinary.js";
+import cloudinary from "../lib/cloudinary.js";
 
 export const signup = async (req, res) => {
     const { fullName, email, password} = req.body;
@@ -75,11 +75,10 @@ export const signup = async (req, res) => {
 
 export const login = async (req, res) => {
     const { email, password } = req.body;
-
+    console.log(email, password)
     if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
     }
-
     try {
         //이미 존재하는 유저인지 확인하기 위해 해당 email을 db에서 검색해본다.
         const user = await User.findOne({ email });
@@ -96,7 +95,7 @@ export const login = async (req, res) => {
             _id: user._id,
             fullName: user.fullName,
             email: user.email,
-            profilePic: user.profilePic,
+            profilePic: user.profilePic, 
          });
 
     } catch (error) {

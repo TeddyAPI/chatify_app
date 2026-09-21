@@ -2,11 +2,12 @@ import jwt from "jsonwebtoken"
 import User from "../models/User.js"
 import { ENV } from "../lib/env.js"
 
-export const socketAuthMiddleware = async (socketAuthMiddleware, next) => {
+export const socketAuthMiddleware = async (socket, next) => {
     try {
+        console.log("start a socket middleware")
         //frontend에서 socket.io를 호출해 통신에 참여하면 브라우저에서 로그인시 생성된 token을 socket.handshake.headers.cookies에 담아 전달한다.
         //socket 통신에 참여전 token을 검증한다.
-        const token = socket.handshake.headers.cookies
+        const token = socket.handshake.headers.cookie
             ?.split("; ")
             .find((row) => row.startsWith("jwt="))
             ?.split("=")[1];

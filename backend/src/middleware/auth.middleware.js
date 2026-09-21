@@ -13,7 +13,9 @@ export const protectRoute = async (req, res, next) => {
         const user = await User.findById(decoded.userId).select("-password");
         if (!user) return res.status(404).json({ message: "User not found" });
 
-        //기존 req.user는 로그인 정보만 담고 있기 때문에 DB에서 얻은 풀 유저 객체 정보를 req.user에 대입
+        //기존 req.user는 로그인 정보만 담고 있기 때문에 
+        // DB에서 얻은 풀 유저 객체 정보를 req.user에 대입
+        //추가된 req.user 는 몽고DB 객체 타입이라서 사용시 toString() 필요
         req.user = user
 
         next();

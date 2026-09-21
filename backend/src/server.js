@@ -6,9 +6,11 @@ import path from "path";
 import cors from "cors";
 
 import { connectDB } from "./lib/db.js";
-import authRoutes from "./routes/auth.route.js"
+import userRoutes from "./routes/user.route.js"
 import messageRoutes from "./routes/message.route.js"
-import { app, server } from "./lib/socket.js";
+import roomRoutes from "./routes/room.route.js"
+
+import { app, server } from "./lib/old.socket.js";
 
 //현재 작업 디렉터리(CWD)를 절대 경로로 반환
 const __dirname = path.resolve();
@@ -33,8 +35,9 @@ app.use(cors({ origin: ENV.CLIENT_URL, credentials: true}))
 //인증 시스템(JWT, 로그인, 로그아웃, 사용자인증 상태)을 사용할 거면 거의 필수
 app.use(cookieParser())
 
-app.use("/api/auth", authRoutes)
+app.use("/api/auth", userRoutes)
 app.use("/api/messages", messageRoutes)
+app.use("/api/rooms", roomRoutes)
 
 //백엔드 한군데에서 프론트와 API 모두 서빙하는 구조에서 SPA의 내부 라우터 경로를 모르기 때문에 어떤 주소가 들어오든 index.html 반환
 //React/Vite 빌드한 결과(dist 폴더)를 정적(static)파일로 제공 즉, /dist 안에 있는 js, css, 이미지들이 Express에서 서빙됨

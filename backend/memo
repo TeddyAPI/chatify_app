@@ -1,0 +1,162 @@
+const io = require("socket.io")(3000);
+
+io.on("connection", (socket) => {
+  console.log("유저 접속:", socket.id);
+
+  // 1. 방 생성 및 참가 (본인이 방을 만들 때)
+  socket.on("create_room", (roomName) => {
+    socket.join(roomName);
+    console.log(`${socket.id}가 방 [${roomName}]을 생성했습니다.`);
+    socket.emit("room_created", roomName);
+  });
+
+  // 2. 다른 유저를 방에 초대하기
+  // invite_user 이벤트: { targetSocketId: "초대할유저ID", roomName: "방이름" }
+  socket.on("invite_user", ({ targetSocketId, roomName }) => {
+    const targetSocket = io.sockets.sockets.get(targetSocketId);
+
+    if (targetSocket) {
+      targetSocket.join(roomName); // 대상 유저를 방에 강제 조인시킴
+      
+      // 초대받은 유저에게 알림
+      io.to(targetSocketId).emit("invited_to_room", {
+        roomName,
+        invitedBy: socket.id
+      });
+
+      // 방 전체에 새로운 멤버 입장 알림
+      io.to(roomName).emit("message", `${targetSocketId}님이 입장하셨습니다.`);
+    } else {
+      socket.emit("error_message", "유저를 찾을 수 없습니다.");
+    }
+  });
+
+  // 3. 방에 메시지 보내기
+  socket.on("send_message", ({ roomName, message }) => {
+    // roomName에 속한 모든 유저에게 메시지 전송 (보낸 사람 포함)
+    io.to(roomName).emit("receive_message", {
+      sender: socket.id,
+      message
+    });
+  });
+});
+
+const socket = io("http://localhost:3000");
+
+// 방 만들기
+function createRoom(name) {
+  socket.emit("create_room", name);
+}
+
+// 특정 유저 초대하기
+function inviteUser(targetId, room) {
+  socket.emit("invite_user", { targetSocketId: targetId, roomName: room });
+}
+
+// 초대받았을 때 이벤트 처리
+socket.on("invited_to_room", (data) => {
+  console.log(`${data.invitedBy}님이 당신을 ${data.roomName}방에 초대했습니다!`);
+});
+
+// 메시지 수신
+socket.on("receive_message", (data) => {
+  console.log(`[${data.sender}]: ${data.message}`);
+});
+
+ socket.io 접속
+
+ 기존에 참여된 채널이 있는지 room db에서 검색
+
+ 있으면 접속
+
+ 새로운 룸 생성 요청
+
+ 룸에 접속
+
+ 초대해서
+
+
+  📂 제안하는 프로젝트 구조 (Refined Architecture)
+
+    1 src/
+    2 ├── controllers/      # [Layer 1] HTTP 요청 처리, 유효성 검사, 서비스 호출, 응답 반환
+    3 │   ├── auth.controller.js
+    4 │   ├── room.controller.js
+    5 │   └── message.controller.js
+    6 │
+    7 ├── services/         # [Layer 2] 비즈니스 로직 핵심, Repository와 Publisher를 조합
+    8 │   ├── auth.service.js
+    9 │   ├── room.service.js      # 예: 방 생성 시 "권한 체크 -> DB 저장 -> 소켓 알림" 순서 제어
+   10 │   └── message.service.js
+   11 │
+   12 ├── repositories/     # [Layer 3] DB 전담 (Mongoose 쿼리만 존재)
+   13 │   ├── user.repository.js
+   14 │   ├── room.repository.js    # 예: Room.findById, Room.create 등 몽구스 메서드 캡슐화
+   15 │   └── message.repository.js
+   16 │
+   17 ├── publishers/       # [Layer 4] 소켓 통신 전담 (Socket.io Emit 로직)
+   18 │   ├── room.publisher.js    # 예: 특정 방에 조인시키기, "방 생성됨" 이벤트 전송
+          ├── notification.publisher.js
+   19 │   └── message.publisher.js
+   20 │
+   21 ├── models/           # DB 스키마 정의 (Mongoose 모델)
+   22 │   ├── User.js
+   23 │   ├── Room.js
+   24 │   └── Message.js
+   25 │
+   26 ├── routes/           # 라우팅 설정 (URL 연결)
+   27 ├── middleware/       # 인증(Auth), 보안(Arcjet) 등 미들웨어
+   28 ├── lib/              # 공통 라이브러리 (db연결, 소켓 초기화, 환경변수)
+   29 └── server.js         # 앱 실행 및 서버 설정
+
+
+
+  ┌──────────────────────┬──────────────────┬───────────────────────────────────────┐
+  │ 카테고리                │ 방식             │ 추천 적용 대상                            │
+  ├──────────────────────┼──────────────────┼───────────────────────────────────────┤
+  │ A. 소켓(데이터) + DB │ 즉시 전송 & 저장 │ 채팅 메시지, 시스템 메시지(입장/퇴장)                │
+  │ B. 소켓(신호) + DB   │ 핑 전송 & 저장   │ 방 초대, 언급(@), 중요 알림                    │
+  │ C. 소켓 전용         │ 전송 후 소멸     │ 온라인 상태, 입력 중, 읽음 확인       │
+  │ D. HTTP 전용         │ 요청 시 응답     │ 과거 내역, 검색, 프로필 조회          │
+  └──────────────────────┴──────────────────┴───────────────────────────────────────┘
+
+소켓(데이터) + DB
+실시간으로 전파되면서 내용 자체가 저장되어야 하는 것들
+채팅 메시지 전송          → messages 컬렉션 저장 + 방 전체에 emit
+파일/이미지 전송          → 파일 저장 + URL을 메시지로 emit
+메시지 수정              → DB 업데이트 + 방 전체에 edited emit
+메시지 삭제              → soft delete + 방 전체에 deleted emit
+메시지 리액션 추가/제거    → reactions 저장 + 해당 메시지에 emit
+답장(reply) 메시지        → 부모 메시지 ref 포함 저장 + emit
+
+소켓(신호) + DB
+내용보다 상태 변경이 핵심이고, 그 변경을 저장하면서 알려야 하는 것들
+방 입장                  → room.participants 업데이트 + joined 신호 emit
+방 퇴장                  → participants 상태 변경 + left 신호 emit
+초대 수락/거절            → status 필드 업데이트 + 결과 신호 emit
+유저 강퇴                → participants 제거 + kicked 신호 emit
+읽음 처리(read receipt)  → lastReadAt 업데이트 + read 신호 emit
+방 이름/설정 변경         → room 도큐먼트 업데이트 + updated 신호 emit
+역할 변경 (admin 지정)    → roles 업데이트 + role_changed 신호 emit
+유저 차단/차단 해제        → block 목록 업데이트 + 신호 emit
+
+소켓 전용
+저장할 필요 없이 그 순간만 의미있는 실시간 신호들
+타이핑 중 표시           → is_typing / stop_typing
+온라인/오프라인 상태       → presence (user_online / user_offline)
+현재 접속 중인 방 위치     → focus_room / blur_room
+메시지 전송 실패 알림      → error 신호 (클라이언트에만)
+소켓 재연결 시 상태 복구   → sync 신호
+
+HTTP 전용
+실시간성이 필요 없고 요청-응답 패턴으로 충분한 것들
+로그인 / 로그아웃          → POST /auth/login, /auth/logout
+회원가입                  → POST /users
+토큰 갱신                 → POST /auth/refresh
+방 생성                  → POST /rooms
+방 목록 조회              → GET /rooms
+메시지 히스토리 조회        → GET /rooms/:id/messages (페이지네이션)
+유저 프로필 조회/수정       → GET,PATCH /users/:id
+방 초대 보내기            → POST /rooms/:id/invites
+읽지 않은 메시지 수 조회    → GET /rooms/:id/unread
+파일 업로드 (presigned URL) → POST /upload
